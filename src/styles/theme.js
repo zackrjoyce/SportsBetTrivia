@@ -11,6 +11,12 @@ export const palette = {
   green1: "#217346",
   green2: "#1a5a33",
   greenBorder: "#2d7a4a",
+  betBg: "#121212",
+  betSurface: "#191919",
+  betBorder: "#374151",
+  betRed: "#ff6060",
+  betOrange: "#ff9900",
+  betGreen: "#a2ff00"
 };
 
 export const fonts = "'Jersey 10', sans-serif";
@@ -23,8 +29,7 @@ export const surfaces = {
       padding: "16px 16px 24px",
       fontFamily: fonts,
       color: palette.text,
-      background: palette.panelBg,
-      border: `1px solid ${palette.border}`,
+
       borderRadius: 12,
     };
   },

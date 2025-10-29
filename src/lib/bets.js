@@ -4,6 +4,56 @@ import {
   flattenPlays, isTouchdownPlay, extractTdScorerFromPlay,
 } from "./football";
 
+/* ===================== localStorage helpers ===================== */
+const LS = {
+  getNumber(key, fallback = 0) {
+    try {
+      const v = localStorage.getItem(key);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  setNumber(key, n) {
+    try {
+      localStorage.setItem(key, String(n));
+    } catch {}
+  }
+};
+
+/** Parse American odds string/number to Decimal odds (>= 1.0).
+ *  Examples: +120 -> 2.2, -150 -> 1.666..., "7451" (treat as +7451) -> 75.51
+ */
+function americanToDecimal(oddsLike) {
+  if (oddsLike == null) return NaN;
+  let s = String(oddsLike).trim();
+  if (!s) return NaN;
+  // extract signed integer (handles "+7451", "-110", " +450 ", etc.)
+  const m = s.match(/^[+\-]?\s*\d+/);
+  if (!m) return NaN;
+  const n = Number(m[0].replace(/\s+/g, ""));
+  if (!Number.isFinite(n) || n === 0) return NaN;
+  if (n > 0) return 1 + (n / 100);
+  return 1 + (100 / Math.abs(n));
+}
+
+/** Try to extract a Decimal odds value from a bet object.
+ *  Checks common fields: price, odds, labelBottom, display, raw.price, raw.odds, etc.
+ */
+function extractDecimalOdds(bet) {
+  const candidates = [
+    bet?.price, bet?.odds, bet?.labelBottom, bet?.display,
+    bet?.bet?.price, bet?.bet?.odds, bet?.raw?.price, bet?.raw?.odds
+  ].filter(v => v != null);
+
+  for (const c of candidates) {
+    const dec = americanToDecimal(c);
+    if (Number.isFinite(dec) && dec > 0) return dec;
+  }
+  return NaN;
+}
+
 /** ============ Bet UI ============ */
 export function initBetUI(betsArg) {
   const arr = Array.isArray(betsArg)
@@ -329,14 +379,44 @@ function gradeSpread(teamCode, spreadThreshold, pbp, H, A) {
     return { result: "pending", reason: "No final score in PBP", actual: null };
   }
 
-  const isHome = (teamCode || "").toUpperCase() === H;
-  const margin = isHome ? (home - away) : (away - home);
-  const line = num(spreadThreshold);
-  if (!Number.isFinite(line)) return { result: "pending", reason: "Invalid spread", actual: margin };
+  const pickedIsHome = (teamCode || "").toUpperCase() === H;
+  const line = num(spreadThreshold); // can be +8.5, -3.5, etc.
+  if (!Number.isFinite(line)) {
+    return { result: "pending", reason: "Invalid spread", actual: null };
+  }
 
-  if (margin > line)   return { result: "won",  reason: `Margin ${margin} > ${line}`, actual: margin };
-  if (margin === line) return { result: "push", reason: `Margin ${margin} = ${line}`, actual: margin };
-  return                 { result: "lost", reason: `Margin ${margin} < ${line}`, actual: margin };
+  // raw margin from picked team's point of view
+  // ex: if I picked HOME, margin = home - away
+  //     if I picked AWAY, margin = away - home
+  const rawMargin = pickedIsHome ? (home - away) : (away - home);
+
+  // Effective margin AFTER the spread is applied
+  // This is literally how books settle ATS:
+  // (teamScore + line) - oppScore  == rawMargin + line
+  const adjustedMargin = rawMargin + line;
+
+  // Grade
+  if (adjustedMargin > 0) {
+    return {
+      result: "won",
+      reason: `${teamCode} covered ${line} (final ${home}-${away})`,
+      actual: rawMargin,
+    };
+  }
+
+  if (adjustedMargin === 0) {
+    return {
+      result: "push",
+      reason: `${teamCode} pushed ${line} (final ${home}-${away})`,
+      actual: rawMargin,
+    };
+  }
+
+  return {
+    result: "lost",
+    reason: `${teamCode} did not cover ${line} (final ${home}-${away})`,
+    actual: rawMargin,
+  };
 }
 
 function gradeTotal(side, totalThreshold, pbp, H, A) {
@@ -383,7 +463,6 @@ function getFinalScoresFromPbp(pbp, H, A) {
     let homeFinal = num(p.pbp_score_hm);
     let awayFinal = num(p.pbp_score_aw);
 
-    // Fallback: fields keyed by team codes (e.g., "NWE", "TEN")
     if (!Number.isFinite(homeFinal) || !Number.isFinite(awayFinal)) {
       const hk = Object.keys(p).find((k) => String(k).toUpperCase() === H);
       const ak = Object.keys(p).find((k) => String(k).toUpperCase() === A);
@@ -399,17 +478,26 @@ function getFinalScoresFromPbp(pbp, H, A) {
   return { home: null, away: null };
 }
 
-
 export function gradeBets(bets = [], ctx = {}) {
   const {
     home, away, pbp, scoring,
     matchup_passing, matchup_receiving, matchup_rushing,
   } = ctx;
 
+  console.log("graded bets");
+  console.log(home);
+  console.log(away);
+  console.log(pbp);
+  console.log(scoring);
+  console.log(matchup_passing);
+  console.log(matchup_receiving);
+  console.log(matchup_rushing);
+
   const H = (home?.code || "").toUpperCase();
   const A = (away?.code || "").toUpperCase();
 
-  return (bets || []).map((b) => {
+  // ---- existing grading ----
+  const graded = (bets || []).map((b) => {
     const market = String(b?.market || b?.bet?.market || "").toLowerCase();
     const type = String(b?.type || b?.bet?.type || "").toLowerCase();
     const sel = b?.selection ?? b?.bet?.selection ?? "";
@@ -417,39 +505,84 @@ export function gradeBets(bets = [], ctx = {}) {
     const details = b?.details ?? b?.bet?.details ?? "";
     const threshold = b?.threshold ?? b?.bet?.threshold ?? "";
 
-    let graded = { result: "pending", reason: "Not graded", actual: null };
+    let g = { result: "pending", reason: "Not graded", actual: null };
 
     if (market === "player") {
       if (type === "td") {
         const th = String(threshold || "").toLowerCase();
         if (th === "first" || th === "last") {
-          graded = gradeTDBetFromPbp(sel, pbp, th); // actual: boolean
+          g = gradeTDBetFromPbp(sel, pbp, th); // actual: boolean
         } else {
           const need = Number(String(threshold).replace(/[^\d.-]/g, "")) || 1;
-          graded = gradeTDBetFromPbp(sel, pbp, "any", need); // actual: count
+          g = gradeTDBetFromPbp(sel, pbp, "any", need); // actual: count
         }
       } else if (["pass_yds", "rec_yds", "rush_yds"].includes(type)) {
-        graded = gradePlayerYards(sel, type, details, threshold, {
+        g = gradePlayerYards(sel, type, details, threshold, {
           matchup_passing, matchup_receiving, matchup_rushing,
         }); // actual: yards
       } else {
-        graded = { result: "pending", reason: `Unknown player market: ${type}`, actual: null };
+        g = { result: "pending", reason: `Unknown player market: ${type}`, actual: null };
       }
     } else if (market === "game") {
       if (type === "moneyline") {
-        graded = gradeMoneyline(team, pbp, H, A); // now uses PBP
+        g = gradeMoneyline(team, pbp, H, A); // now uses PBP
       } else if (type === "spread") {
-        graded = gradeSpread(team, threshold, pbp, H, A); // uses PBP
+        g = gradeSpread(team, threshold, pbp, H, A); // uses PBP
       } else if (type === "total") {
         const side = (sel || "").toString().toLowerCase(); // "over" / "under"
-        graded = gradeTotal(side, threshold, pbp, H, A); // uses PBP
+        g = gradeTotal(side, threshold, pbp, H, A); // uses PBP
       } else {
-        graded = { result: "pending", reason: `Unknown game market: ${type}`, actual: null };
+        g = { result: "pending", reason: `Unknown game market: ${type}`, actual: null };
       }
     } else {
-      graded = { result: "pending", reason: `Unknown market: ${market}`, actual: null };
+      g = { result: "pending", reason: `Unknown market: ${market}`, actual: null };
     }
 
-    return { ...b, result: graded.result, reason: graded.reason, actual: graded.actual };
+    return { ...b, result: g.result, reason: g.reason, actual: g.actual };
   });
+
+  // ---- NEW: localStorage updates based on graded bets ----
+  try {
+    const total = graded.length;
+    const wins = graded.filter(b => b.result === "won");
+    const losses = graded.filter(b => b.result === "lost");
+
+    // 1) product of decimal odds for all won bets
+    let productDecimal = 1;
+    for (const w of wins) {
+      const dec = extractDecimalOdds(w);
+      if (Number.isFinite(dec) && dec > 0) {
+        productDecimal *= dec;
+      }
+    }
+
+    if (wins.length > 0 && Number.isFinite(productDecimal) && productDecimal > 0) {
+      // Compare: if productDecimal is LOWER than stored best, update best_odds_ever
+      const prevBest = LS.getNumber("best_odds_ever", Infinity);
+      if (productDecimal > prevBest) {
+        LS.setNumber("best_odds_ever", productDecimal);
+      }
+    }
+
+    // 2) streak: if all bets graded won -> increment; else reset to 0
+    if (total > 0) {
+      const allWon = wins.length === total && total > 0;
+      if (allWon) {
+        const cur = LS.getNumber("bet_streak", 0);
+        LS.setNumber("bet_streak", cur + 1);
+      } else {
+        LS.setNumber("bet_streak", 0);
+      }
+    }
+
+    // 3) cumulative legs hit/missed
+    const curHit = LS.getNumber("bet_legs_hit", 0);
+    const curMiss = LS.getNumber("bet_legs_missed", 0);
+    LS.setNumber("bet_legs_hit", curHit + wins.length);
+    LS.setNumber("bet_legs_missed", curMiss + losses.length);
+  } catch {
+    // fail silently if storage is unavailable (e.g., privacy mode)
+  }
+
+  return graded;
 }

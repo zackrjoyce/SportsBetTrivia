@@ -1,71 +1,107 @@
 :root {
-  --bsp-height: 85vh;          /* sheet height */
+  /* Layout */
+  --bsp-height: 85vh;
   --bsp-z: 9999;
-  --bsp-bg: #121212;           /* dark grey background */
-  --bsp-surface: #191919;      /* slightly lighter for cards/sections */
-  --bsp-text: #e5e7eb;         /* light text */
-  --bsp-muted: #9ca3af;        /* muted text */
-  --bsp-border: #374151;       /* borders */
-  --bsp-btn-width: 100px;      /* equal width for all buttons */
-  --bsp-btn-height: 56px;      /* NEW: fixed equal height */
-  --bsp-green: #10b981;        /* green bottom label */
+
+  /* Colors */
+  --bsp-bg: #121212;
+  --bsp-surface: #191919;
+  --bsp-text: #ff6060;
+  --bsp-muted: #ff9900;
+  --bsp-border: #374151;
+  --bsp-green: #a2ff00;
+
+  /* Type */
+  --bsp-font-sm: 0.875rem;   /* 14px */
+  --bsp-font-md: 1rem;       /* 16px */
+  --bsp-font-lg: 1.125rem;   /* 18px */
+  --bsp-lh-tight: 1.15;
+  --bsp-lh: 1.3;
+
+  /* Spacing scale */
+  --bsp-2: 8px;
+  --bsp-3: 10px;
+  --bsp-4: 12px;
+  --bsp-5: 16px;
+
+  /* Controls & rows */
+  --bsp-btn-width: 80px;
+  --bsp-btn-height: 56px;
+  --bsp-btn-gap: 8px;
+  --bsp-row-h: 56px;
+  --bsp-row-gap: 10px;
+  --bsp-row-pad-x: 10px;
+  --bsp-row-pad-y: 8px;
+
+  /* Avatar / headshot */
+  --bsp-avatar-col: 56px;     /* reserved left column */
+  --bsp-avatar-size: 40px;    /* image circle */
+  --bsp-avatar-gap: 10px;     /* distance from avatar → title */
+
+  /* Section rhythm */
+  --bsp-section-gap: 16px;        /* space between sections */
+  --bsp-section-pad: 12px;
+  --bsp-section-inner-gap: 10px;  /* title → first block */
+
+  /* Matrix header tuning (the key to your issue) */
+  --bsp-colheader-h: 18px;        /* slim column header height */
+  --bsp-matrix-underhead-gap: 4px;/* space under header → first row (small) */
 }
 
-/* Overlay visibility */
+/* Visibility */
 .bsp-hidden { opacity: 0; pointer-events: none; visibility: hidden; }
 .bsp-visible { opacity: 1; visibility: visible; }
 
-/* Overlay fills the screen */
+/* ===============================
+   Overlay (backdrop)
+=============================== */
 .bsp-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
   z-index: var(--bsp-z);
   display: flex;
   justify-content: center;
-  align-items: flex-end;
+  align-items: flex-end;         /* bottom sheet */
+  background: rgba(0,0,0,0.45);
+  overscroll-behavior: contain;  /* reduce rubber-banding on mobile */
+  transition: opacity 180ms ease;
 }
 
-/* Sheet: full width, dark background, slides up */
+.bsp-exiting { opacity: 0; pointer-events: none; }
+
+/* Sheet */
 .bsp-sheet {
+  width: 100vw;
+  height: var(--bsp-height);     /* fallback initial */
   background: var(--bsp-bg);
   color: var(--bsp-text);
-  width: 100vw;
-  height: var(--bsp-height);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -12px 36px rgba(0,0,0,0.45);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: slideUp 280ms ease-out;
+
+  will-change: transform, height; /* smoother dragging */
 }
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
-}
+
 
 /* Header */
 .bsp-header {
   position: sticky;
   top: 0;
+  z-index: 2;
   background: linear-gradient(0deg, transparent, var(--bsp-bg) 40%);
   border-bottom: 1px solid var(--bsp-border);
   padding: 12px 16px 8px;
-  z-index: 1;
+
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-row-gap: 8px;
   align-items: center;
+  /* NEW: also act as containing block for absolute children */
+  position: relative;
 }
-.bsp-grab {
-  grid-column: 1 / -1;
-  justify-self: center;
-  width: 44px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--bsp-border);
-}
-.bsp-title { margin: 0; font-size: x-large; font-weight: 400; }
+.bsp-title { grid-column: 1; justify-self: start; margin: 0; font-size: x-large; font-weight: 600; text-transform: uppercase; }
+
 .bsp-close {
   justify-self: end;
   background: transparent;
@@ -82,79 +118,95 @@
   flex: 1;
   overflow: auto;
   padding: 12px 16px 20px;
+
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Section card */
+/* Section */
 .bsp-section {
   background: var(--bsp-surface);
-  border-radius: 5px;
+  border-radius: 8px;
   padding: 12px;
+
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
 .bsp-section-title {
-  margin: 0 0 4px 0;
-  font-size: large;
-  font-weight: 400;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 500;
   color: var(--bsp-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+
+  /* normalize spacing under the header across UIs */
+  padding-bottom: 4px;
+  border-bottom: 0; /* ensure no incidental border adds extra space */
 }
 
-/* ==== Default ROW layout ==== */
+/* ===================== DEFAULT ROW ===================== */
 .bsp-row {
   display: grid;
-  grid-template-columns: 56px 1fr auto;
+  grid-template-columns: var(--bsp-avatar-col) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--bsp-gap);
+  min-height: 48px;
 }
 .bsp-row-label {
-  flex: 0 0 auto;
-  padding: 8px 10px;
-  font-size: large;
-  font-weight: 400;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  background: transparent;
+  position: relative;
+  z-index: 0; /* keep below buttons’ z-index */
+  text-transform: uppercase;
 }
 .bsp-row-buttons {
-  margin-left: auto;
+  position: relative;
+  z-index: 2;               /* ensure on top */
   display: flex;
   align-items: stretch;
   gap: 8px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: thin;
+  flex-wrap: wrap;          /* wrap instead of scroll */
+  overflow: visible;
+  max-width: 100%;
 }
 
-/* ==== Buttons (shared) ==== */
+/* ===================== BUTTONS (shared) ===================== */
 .bsp-btn {
   width: var(--bsp-btn-width);
+  height: var(--bsp-btn-height);
   flex: 0 0 var(--bsp-btn-width);
-  height: var(--bsp-btn-height);       /* fixed height */
   background: #262626;
   border: 1px solid var(--bsp-green);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
 
-  display: grid;                       /* always a grid */
-  grid-template-rows: 1fr 1fr;         /* two rows reserved */
+  display: grid;
+  grid-template-rows: 1fr 1fr;
   align-items: center;
   justify-items: center;
   text-align: center;
   padding: 6px 10px;
-}
 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bsp-btn:hover {
   background: #0e1626;
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
 }
 
 .bsp-btn-top {
-  font-size: large;
+  font-size: 0.98rem;
   color: #ffffff;
   line-height: 1.1;
   display: flex;
@@ -162,51 +214,43 @@
   justify-content: center;
 }
 .bsp-btn-bottom {
-  font-size: large;
+  font-size: 0.98rem;
   color: var(--bsp-green);
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Fix: if single-line, bottom spans both rows, button height stays equal */
+/* Single-line version */
 .bsp-btn.bsp-btn-single .bsp-btn-top { display: none; }
 .bsp-btn.bsp-btn-single .bsp-btn-bottom {
   grid-row: 1 / span 2;
   align-self: center;
   justify-self: center;
 }
-
-.bsp-btn, .bsp-btn-top, .bsp-btn-bottom {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Active/conflict states */
+.bsp-btn, .bsp-btn-top, .bsp-btn-bottom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bsp-btn.active {
-  background: #065f46;
+  background: #a2ff00;
   border-color: #059669;
   color: #fff;
 }
-.bsp-btn.active .bsp-btn-top { color: #fff; }
-.bsp-btn.active .bsp-btn-bottom { color: #d1fae5; }
+.bsp-btn.active .bsp-btn-top { color: #191919; }
+.bsp-btn.active .bsp-btn-bottom { color: #191919; }
 
 .bsp-btn.conflict {
-  outline: .1px solid #ef4444;
+  outline: 1px solid #ef4444;
+  background: #ef4444;
   border-color: #ef4444;
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
 }
-.bsp-btn.conflict .bsp-btn-bottom { color: #fee2e2; }
+.bsp-btn.conflict .bsp-btn-bottom { color: #191919; }
 
 /* Scrollbars */
 .bsp-row-buttons { scrollbar-color: var(--bsp-border) transparent; }
 .bsp-row-buttons::-webkit-scrollbar { height: 6px; }
-.bsp-row-buttons::-webkit-scrollbar-thumb {
-  background: var(--bsp-border); border-radius: 999px;
-}
+.bsp-row-buttons::-webkit-scrollbar-thumb { background: var(--bsp-border); border-radius: 999px; }
 .bsp-row-buttons::-webkit-scrollbar-track { background: transparent; }
 
 /* Footer */
@@ -220,13 +264,19 @@
   bottom: 0;
   z-index: 2;
 }
+.bsp-footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
 .bsp-footer-btn {
   background: linear-gradient(to bottom, #ffcc00, #d4a017);
   color: #111;
   border: 3px solid #111;
   border-radius: 10px;
   padding: 12px 28px;
-  font-size: large;
+  font-size: 1rem;
   cursor: pointer;
   text-transform: uppercase;
   box-shadow: 0 4px 0 #000, 0 6px 14px rgba(0,0,0,0.6);
@@ -242,53 +292,70 @@
   filter: grayscale(35%);
   box-shadow: none;
 }
-.bsp-footer-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
 .bsp-conflict-hint {
-  font-size: large;
+  font-size: 0.95rem;
   color: #fca5a5;
   text-align: center;
 }
-.bsp-rule-tag { font-weight: 400; color: var(--bsp-muted); font-size: large; }
+.bsp-rule-tag { font-weight: 400; color: var(--bsp-muted); font-size: var(--bsp-font-sm); }
 
-/* ======== MATRIX SECTION (twoRow3) ======== */
+/* ===================== AVATAR (shared) ===================== */
+.bsp-headshot-wrap {
+  width: var(--bsp-avatar-col);
+  display: grid;
+  place-items: center;
+}
+.bsp-headshot {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bsp-headshot--contain { object-fit: contain; background: #1112; }
+
+/* ===================== MATRIX (two-by-3) ===================== */
 .bsp-matrix {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
+
 .bsp-matrix-head {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: var(--bsp-avatar-col) 1fr auto;
   align-items: center;
 }
-.bsp-matrix-spacer { min-width: 120px; }
+.bsp-matrix-spacer {
+  width: var(--bsp-avatar-col);
+  min-width: var(--bsp-avatar-col);
+  height: 1px; /* just a spacer */
+}
+
+/* align column headers to the right, matching button widths */
 .bsp-matrix-colheaders {
+  grid-column: 3;
   display: grid;
   grid-template-columns: repeat(3, var(--bsp-btn-width));
   gap: 8px;
   justify-content: end;
 }
 .bsp-colheader {
-  height: 36px;
+  height: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
 }
 .bsp-colheader-text {
-  font-size: medium;
+  font-size: 0.92rem;
   color: var(--bsp-muted);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-transform: uppercase;
 }
 
+/* Matrix body rows (same rhythm as default rows) */
 .bsp-matrix-body {
   display: flex;
   flex-direction: column;
@@ -296,60 +363,90 @@
 }
 .bsp-matrix-row {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-height: 44px;
 }
-/* matrix row: headshot next to the row title */
+
+/* Label block uses the SAME avatar column + SAME avatar→title gap */
 .bsp-matrix-rowlabel {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: var(--bsp-avatar-col) minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
+.bsp-matrix-rowtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  background: transparent;
+  position: relative;
+  z-index: 0; /* never above buttons */
+  text-transform: uppercase;
+}
+
+/* Buttons in matrix rows (match shared sizing) */
 .bsp-matrix-buttons {
   display: grid;
   grid-template-columns: repeat(3, var(--bsp-btn-width));
   gap: 8px;
   justify-content: end;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: thin;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 .bsp-btn-cell {
   width: var(--bsp-btn-width);
+  height: var(--bsp-btn-height);
   flex: 0 0 var(--bsp-btn-width);
-  height: var(--bsp-btn-height);  /* match standard buttons */
 }
 
-/* --- Player headshot support --- */
-.bsp-btn.has-headshot {
-  /* add a narrow column for the image, keep 2 text rows */
-  grid-template-columns: 40px 1fr;
-  grid-template-rows: 1fr 1fr;
-  column-gap: 8px;
+/* === Dragging affordances === */
+/* Bigger hit area + mobile drag */
+.bsp-grab {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 4px;
+  margin: 2px auto 0;
+  border-radius: 999px;
+  background: var(--bsp-border);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
-.bsp-btn.has-headshot .bsp-btn-top,
-.bsp-btn.has-headshot .bsp-btn-bottom {
-  grid-column: 2;        /* text sits in the right column */
+.bsp-grab::before {
+  content: "";
+  position: absolute;
+  inset: -20px -12px;  /* big invisible hitbox */
+  border-radius: 16px;
+  background: rgba(0,0,0,0);
+  pointer-events: auto;
 }
 
-/* left-of-row headshot container */
-.bsp-headshot-wrap {
-  width: 56px;            /* reserve space */
-  display: grid;
-  place-items: center;
-  margin-right: 8px;
+/* Nice focus ring on keyboard nav, applied to hitbox */
+.bsp-grab:focus-visible::before {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
 }
 
-.bsp-headshot {
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #234a33;
-  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+.bsp-grab.is-dragging { cursor: grabbing; }
+
+/* Applied by JS *only when releasing* to animate snap */
+.bsp-sheet.drag-transition {
+  transition: height 180ms ease, transform 180ms ease, opacity 180ms ease;
 }
+
+
+/* Scrollbars for matrix buttons (unified look) */
+.bsp-matrix-buttons { scrollbar-color: var(--bsp-border) transparent; }
+.bsp-matrix-buttons::-webkit-scrollbar { height: 6px; }
+.bsp-matrix-buttons::-webkit-scrollbar-thumb { background: var(--bsp-border); border-radius: 999px; }
+.bsp-matrix-buttons::-webkit-scrollbar-track { background: transparent; }
 

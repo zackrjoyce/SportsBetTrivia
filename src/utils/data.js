@@ -1,4 +1,6 @@
 // S3 public URL (change if you move it)
+import { splitOffenseStats } from "./splitStats";
+
 export const GAME_DATA_URL =
   import.meta.env.VITE_GAME_DATA_URL ||
   "https://sportstriviabucket.s3.us-east-2.amazonaws.com/gamedata.json";
@@ -13,18 +15,39 @@ export async function fetchGameData(url = GAME_DATA_URL) {
 }
 
 const teamMap = {
-  nwe: { code: "NWE", name: "New England Patriots", logo: "/logos/patriots.png", color: "#002244" },
-  oti: { code: "TEN", name: "Tennessee Titans",   logo: "/logos/titans.png",   color: "#0C2340" },
+  crd: { code: "ARI", name: "Arizona Cardinals",        logo: "/logos/cardinals.png",     color: "#97233F" },
+  atl: { code: "ATL", name: "Atlanta Falcons",          logo: "/logos/falcons.png",       color: "#A71930" },
+  rav: { code: "BAL", name: "Baltimore Ravens",         logo: "/logos/ravens.png",        color: "#241773" },
+  buf: { code: "BUF", name: "Buffalo Bills",            logo: "/logos/bills.png",         color: "#00338D" },
+  car: { code: "CAR", name: "Carolina Panthers",        logo: "/logos/panthers.png",      color: "#0085CA" },
+  chi: { code: "CHI", name: "Chicago Bears",            logo: "/logos/bears.png",         color: "#0B162A" },
+  cin: { code: "CIN", name: "Cincinnati Bengals",       logo: "/logos/bengals.png",       color: "#FB4F14" },
+  cle: { code: "CLE", name: "Cleveland Browns",         logo: "/logos/browns.png",        color: "#311D00" },
+  dal: { code: "DAL", name: "Dallas Cowboys",           logo: "/logos/cowboys.png",       color: "#003594" },
+  den: { code: "DEN", name: "Denver Broncos",           logo: "/logos/broncos.png",       color: "#FB4F14" },
+  det: { code: "DET", name: "Detroit Lions",            logo: "/logos/lions.png",         color: "#0076B6" },
+  gnb: { code: "GB",  name: "Green Bay Packers",        logo: "/logos/packers.png",       color: "#203731" },
+  htx: { code: "HOU", name: "Houston Texans",           logo: "/logos/texans.png",        color: "#03202F" },
+  clt: { code: "IND", name: "Indianapolis Colts",       logo: "/logos/colts.png",         color: "#002C5F" },
+  jag: { code: "JAX", name: "Jacksonville Jaguars",     logo: "/logos/titans.png",       color: "#006778" },
+  kan: { code: "KC",  name: "Kansas City Chiefs",       logo: "/logos/chiefs.png",        color: "#E31837" },
+  rai: { code: "LV",  name: "Las Vegas Raiders",        logo: "/logos/raiders.png",       color: "#000000" },
+  sdb: { code: "LAC", name: "Los Angeles Chargers",     logo: "/logos/chargers.png",      color: "#0080C6" },
+  ram: { code: "LAR", name: "Los Angeles Rams",         logo: "/logos/rams.png",          color: "#003594" },
+  mia: { code: "MIA", name: "Miami Dolphins",           logo: "/logos/dolphins.png",      color: "#008E97" },
+  min: { code: "MIN", name: "Minnesota Vikings",        logo: "/logos/vikings.png",       color: "#4F2683" },
+  nwe: { code: "NE",  name: "New England Patriots",     logo: "/logos/patriots.png",      color: "#002244" },
+  nor: { code: "NO",  name: "New Orleans Saints",       logo: "/logos/saints.png",        color: "#D3BC8D" },
+  nyg: { code: "NYG", name: "New York Giants",          logo: "/logos/giants.png",        color: "#0B2265" },
+  nyj: { code: "NYJ", name: "New York Jets",            logo: "/logos/jets.png",          color: "#125740" },
+  phi: { code: "PHI", name: "Philadelphia Eagles",      logo: "/logos/eagles.png",        color: "#004C54" },
+  pit: { code: "PIT", name: "Pittsburgh Steelers",      logo: "/logos/steelers.png",      color: "#FFB612" },
+  sfo: { code: "SF",  name: "San Francisco 49ers",      logo: "/logos/49ers.png",         color: "#AA0000" },
+  sea: { code: "SEA", name: "Seattle Seahawks",         logo: "/logos/seahawks.png",      color: "#002244" },
+  tam: { code: "TB",  name: "Tampa Bay Buccaneers",     logo: "/logos/buccaneers.png",    color: "#D50A0A" },
+  oti: { code: "TEN", name: "Tennessee Titans",         logo: "/logos/titans.png",        color: "#0C2340" },
+  was: { code: "WAS", name: "Washington Commanders",    logo: "/logos/commanders.png",    color: "#5A1414" }
 };
-
-const terminologyMap = {
-  "1td": "Anytime TD",
-  "2td": "2+ TDs",
-  "firsttd": "First TD",
-  "rec_yds": "Receiving yards",
-  "rush_yds": "Rushing yards",
-  "pass_yds": "Passing yards",
-}
 
 const minimumYardage = 7.5;
 const evenOdds = -110;
@@ -43,13 +66,31 @@ export function extractGameEntities(gd) {
   const date = matchupParsed?.matchupstats?.scorebox_meta?.date || "";
   const time = matchupParsed?.matchupstats?.scorebox_meta?.start_time || "";
   const stadium = matchupParsed?.matchupstats?.scorebox_meta?.stadium || "";
+  let MonthDay = getMonthDay(date);
+
+  const team1GamesObj = team1Parsed?.data?.games;
+  const team1Games  = Object.values(team1GamesObj || {});
+  const team2GamesObj = team2Parsed?.data?.games;
+  const team2Games  = Object.values(team2GamesObj || {});
+
+  const team1MatchUp = findGameByDate(team1Games, MonthDay);
+  const team2MatchUp = findGameByDate(team2Games, MonthDay);
+
+  const homeRec = team1MatchUp.team_record;
+  const awayRec = team2MatchUp.team_record;
+
+  let week = team1MatchUp.week_num;
+
+  if (!classifyString(week)){
+    week = "Week " + week;
+  }
 
   const pbp = matchupParsed?.matchupstats?.pbp || null;
   const game_info = matchupParsed?.matchupstats?.game_info || {};
 
-  const matchup_passing = matchupParsed?.matchupstats?.passing_advanced || {};
-  const matchup_rushing = matchupParsed?.matchupstats?.rushing_advanced || {};
-  const matchup_receiving = matchupParsed?.matchupstats?.receiving_advanced || {};
+  //const matchup_passing = matchupParsed?.matchupstats?.passing_advanced || {};
+  //const matchup_rushing = matchupParsed?.matchupstats?.rushing_advanced || {};
+  //const matchup_receiving = matchupParsed?.matchupstats?.receiving_advanced || {};
   const matchup_defense = matchupParsed?.matchupstats?.advanced_defense || {};
   const scoring = matchupParsed?.matchupstats.scoring || {};
 
@@ -59,9 +100,13 @@ export function extractGameEntities(gd) {
 
   const seasonstats_team1 = team1Parsed?.data || {};
   const seasonstats_team2 = team2Parsed?.data || {};
+  console.log("data parsed");
+  console.log(matchupParsed?.matchupstats.player_offense);
+
+  const { matchup_passing, matchup_rushing, matchup_receiving } = splitOffenseStats(matchupParsed?.matchupstats.player_offense);
 
   return {
-    home, away, date, time, stadium, game_info, pbp, scoring,
+    home, away, homeRec, awayRec,  date, time, stadium, week, game_info, pbp, scoring,
     matchup_passing, matchup_rushing, matchup_receiving, matchup_defense,
     homeTeamStarters, awayTeamStarters,
     seasonstats_team1, seasonstats_team2
@@ -77,6 +122,8 @@ export function buildBetSections(
   homeTeamStarters, awayTeamStarters,
   seasonstats_team1, seasonstats_team2
 ) {
+  console.log("building bet sections");
+
   const homeStartersKeys = Object.keys(homeTeamStarters || {});
   const awayStartersKeys = Object.keys(awayTeamStarters || {});
 
@@ -116,7 +163,7 @@ export function buildBetSections(
   const passing1_starters = passing1.filter(i => homeStartersKeys.includes(i.name_display) || recordedStatsPassing.includes(i.name_display));
   const rushing1_starters = rushRec1.filter(i => homeStartersKeys.includes(i.name_display) || recordedStatsRushing.includes(i.name_display));
   const receiving1_starters = rushRec1.filter(i => homeStartersKeys.includes(i.name_display) || recordedStatsReceiving.includes(i.name_display));
-  const td1_starters = tds1.filter(i => awayStartersKeys.includes(i.name_display) || recordedStatsReceiving.includes(i.name_display) || recordedStatsRushing.includes(i.name_display) || recordedStatsPassing.includes(i.name_display));
+  const td1_starters = tds1.filter(i => homeStartersKeys.includes(i.name_display) || recordedStatsReceiving.includes(i.name_display) || recordedStatsRushing.includes(i.name_display) || recordedStatsPassing.includes(i.name_display));
 
   const passing2_starters = passing2.filter(i => awayStartersKeys.includes(i.name_display) || recordedStatsPassing.includes(i.name_display));
   const rushing2_starters = rushRec2.filter(i => awayStartersKeys.includes(i.name_display) || recordedStatsRushing.includes(i.name_display));
@@ -612,7 +659,7 @@ export function buildBetSections(
         },
       ])),
   };
-
+  
   return [
     general, touchdowns, section1, section2, section3, section4, section5, section6
   ].filter(s => (s?.rows?.length ?? 0) > 0);
@@ -698,9 +745,6 @@ function spreadToMoneyline(spread, { sigma = 13.5, vig = 0.048 } = {}) {
   const favProbJuiced = Math.min(favProb * (1 + vig), 0.999);
   const dogProbJuiced = Math.min(dogProb * (1 + vig), 0.999);
 
-  console.log(favProbJuiced);
-  console.log(dogProbJuiced);
-
   if (spread < 0) {
     // Favorite
     return favProbJuiced;
@@ -708,4 +752,42 @@ function spreadToMoneyline(spread, { sigma = 13.5, vig = 0.048 } = {}) {
     // Underdog
     return dogProbJuiced;
   }
+}
+
+const monthMap =
+{
+  "Jan": "January",
+  "Feb": "February",
+  "Mar": "March",
+  "Apr": "April",
+  "May": "May",
+  "Jun": "June",
+  "Jul": "July",
+  "Aug": "August",
+  "Sep": "September",
+  "Oct": "October",
+  "Nov": "November",
+  "Dec": "December",
+}
+
+function getMonthDay(dateStr) {
+  // Split by space and take index 1 (month) and 2 (day,)
+  const parts = dateStr.trim().split(" ");
+  const month = parts[1];
+  const day = parts[2].replace(",", ""); // remove comma
+  return `${monthMap[month]} ${day}`;
+}
+
+function findGameByDate(gamesArray, targetDate) {
+  return gamesArray.find(
+    g => g.game_date === targetDate
+  ) || null;
+}
+
+function classifyString(str) {
+  const trimmed = str.trim();
+
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return false;
+  if (/^[a-zA-Z]+$/.test(trimmed)) return true;
+  return true;
 }
